@@ -1,6 +1,14 @@
-<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
-<title>Multi-chronomètre</title>
-<meta name="claude:viewport-fit-sides" content="cover">
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Chronos</title>
+<link rel="apple-touch-icon" sizes="180x180" href="chronos-icon.png">
+<link rel="icon" type="image/png" href="chronos-icon.png">
+<style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
+</head>
+<body>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
@@ -65,6 +73,9 @@ button { cursor: pointer; }
 #dayView { grid-template-columns: minmax(0, 1fr); }
 .eyebrow { margin: 0; font-size: 12px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); }
 .muted { color: var(--muted); }
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand-icon { width: 40px; height: 40px; flex: none; display: block; border-radius: 9px; background: var(--accent); }
+.brand-name { font: 700 24px/1 var(--display); letter-spacing: -.01em; }
 
 /* Day chips */
 .chips { display: flex; gap: 8px; overflow-x: auto; padding: 2px 0 8px; margin-top: 8px; scrollbar-width: thin; -webkit-overflow-scrolling: touch; }
@@ -173,7 +184,10 @@ button { cursor: pointer; }
 
 <main class="wrap">
   <header>
-    <p class="eyebrow">Multi-chronomètre</p>
+    <div class="brand">
+      <img class="brand-icon" id="brandIcon" width="40" height="40" alt="" decoding="async">
+      <span class="brand-name">Chronos</span>
+    </div>
     <div class="chips" id="chips" role="tablist" aria-label="Journées"></div>
     <div class="adjbar">
       <label for="stepSel">Ajustement</label>
@@ -312,6 +326,11 @@ button { cursor: pointer; }
   var armTimer = null;
 
   function $(id) { return document.getElementById(id); }
+  (function () {
+    var link = document.querySelector('link[rel="apple-touch-icon"]');
+    var img = document.getElementById('brandIcon');
+    if (link && img) img.src = link.getAttribute('href');
+  })();
   function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
   function uid() { return Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-3); }
@@ -906,4 +925,5 @@ button { cursor: pointer; }
   })();
 })();
 </script>
-</body></html>
+</body>
+</html>

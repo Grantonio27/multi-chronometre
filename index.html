@@ -137,6 +137,12 @@ button { cursor: pointer; }
 .confirm > span { flex: 1 1 150px; }
 .confirm .btn { min-height: 40px; }
 
+.figs { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.fig { display: grid; gap: 6px; min-width: 0; }
+.val { font: 600 20px/1 var(--mono); font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.sec { display: grid; gap: 12px; }
+.sec-title { margin: 0; font: 700 22px/1.15 var(--display); text-wrap: balance; }
+
 .add-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
 .add-form .text { background: var(--surface); }
 .add-form .btn { min-height: 48px; }
@@ -212,23 +218,42 @@ button { cursor: pointer; }
         <span class="lbl">Temps cumulé</span>
         <span class="total" id="total">0:00:00</span>
       </div>
-      <div class="bar" id="bar" role="img" aria-label="Répartition du temps entre les tâches"></div>
-      <p class="fine">Les chronos peuvent tourner en même temps, donc le cumul peut dépasser la durée réelle de la journée.</p>
+      <div class="figs">
+        <div class="fig"><span class="lbl">Tâches</span><span class="val" id="totalTasks">0:00:00</span></div>
+        <div class="fig"><span class="lbl">Moods</span><span class="val" id="totalMoods">0:00:00</span></div>
+      </div>
+      <p class="fine" id="realNote">Le temps cumulé compte une seule fois les moments où une tâche et un mood tournent en même temps. Les ajustements avec + et − n’y sont pas ajoutés.</p>
+      <p class="fine" id="legacyNote" hidden>Cette journée date d’avant le calcul du temps réel : son cumul additionne tous les chronos.</p>
     </div>
 
-    <ul class="tasks" id="tasks"></ul>
-    <p class="empty" id="noTasks" hidden>Aucune tâche pour l’instant. Ajoute la première ci-dessous, par exemple Courriels, Réunion ou Rédaction.</p>
+    <section class="sec" aria-labelledby="tasksTitle">
+      <h2 class="sec-title" id="tasksTitle">Tâches</h2>
+      <div class="bar" id="tasksBar" role="img" aria-label="Répartition du temps entre les tâches"></div>
+      <ul class="tasks" id="tasksList"></ul>
+      <p class="empty" id="tasksEmpty" hidden>Aucune tâche pour l’instant. Ajoute la première ci-dessous, par exemple Courriels, Réunion ou Rédaction.</p>
+      <form class="add-form" id="tasksForm" autocomplete="off">
+        <input class="text" id="tasksName" type="text" maxlength="40" placeholder="Nouvelle tâche (ex. Courriels)" aria-label="Nom de la nouvelle tâche" enterkeyhint="done">
+        <button class="btn primary" type="submit" id="tasksAddBtn">Ajouter</button>
+      </form>
+      <p class="fine" id="tasksLimit" hidden>10 tâches maximum par journée. Supprime-en une pour en ajouter une autre.</p>
+    </section>
 
-    <form class="add-form" id="addForm" autocomplete="off">
-      <input class="text" id="taskName" type="text" maxlength="40" placeholder="Nouvelle tâche (ex. Courriels)" aria-label="Nom de la nouvelle tâche" enterkeyhint="done">
-      <button class="btn primary" type="submit" id="addBtn">Ajouter</button>
-    </form>
-    <p class="fine" id="limitNote" hidden>10 tâches maximum par journée. Supprime-en une pour en ajouter une autre.</p>
+    <section class="sec" aria-labelledby="moodsTitle">
+      <h2 class="sec-title" id="moodsTitle">Moods</h2>
+      <div class="bar" id="moodsBar" role="img" aria-label="Répartition du temps entre les moods"></div>
+      <ul class="tasks" id="moodsList"></ul>
+      <p class="empty" id="moodsEmpty" hidden>Aucun mood pour l’instant. Ajoute le premier ci-dessous, par exemple Concentré, Fatigué ou Content.</p>
+      <form class="add-form" id="moodsForm" autocomplete="off">
+        <input class="text" id="moodsName" type="text" maxlength="40" placeholder="Nouveau mood (ex. Concentré)" aria-label="Nom du nouveau mood" enterkeyhint="done">
+        <button class="btn primary" type="submit" id="moodsAddBtn">Ajouter</button>
+      </form>
+      <p class="fine" id="moodsLimit" hidden>10 moods maximum par journée. Supprime-en un pour en ajouter un autre.</p>
+    </section>
 
     <div class="day-actions">
       <button class="link" type="button" id="dayDelete">Supprimer cette journée</button>
       <div class="panel" id="dayConfirm" hidden>
-        <p style="margin:0 0 12px;color:var(--fg)">Supprimer cette journée ? Les tâches et les temps enregistrés seront perdus.</p>
+        <p style="margin:0 0 12px;color:var(--fg)">Supprimer cette journée ? Les tâches, les moods et les temps enregistrés seront perdus.</p>
         <div class="row">
           <button class="btn danger" type="button" id="dayConfirmYes">Supprimer la journée</button>
           <button class="btn" type="button" id="dayConfirmNo">Annuler</button>
@@ -255,6 +280,11 @@ button { cursor: pointer; }
   'use strict';
 
   var MAX = 10;
+  var TYPES = ['tasks', 'moods'];
+  var KIND = {
+    tasks: { prefix: 't', fallback: 'la tâche', nameAria: 'Nom de la tâche', confirm: 'Supprimer cette tâche ?' },
+    moods: { prefix: 'm', fallback: 'le mood', nameAria: 'Nom du mood', confirm: 'Supprimer ce mood ?' }
+  };
   var KEY = 'multichrono.v1';
   var SELKEY = 'multichrono.sel';
   var STEPKEY = 'multichrono.step';
@@ -268,13 +298,13 @@ button { cursor: pointer; }
   var creating = false;
   var ready = false;
   var mode = null;
-  var pendingTask = null;
+  var pendingItem = null;
   var dayArmed = false;
   var pendingWrites = 0;
   var lastMap = null;
   var queue = Promise.resolve();
   var adapter = null;
-  var taskEls = {};
+  var itemEls = {};
   var running = false;
   var deferred = false;
   var toastTimer = null;
@@ -315,21 +345,30 @@ button { cursor: pointer; }
     return e;
   }
 
+  function normItems(arr, prefix) {
+    arr = Array.isArray(arr) ? arr.slice(0, MAX) : [];
+    return arr.map(function (t, i) {
+      t = t || {};
+      return {
+        id: String(t.id || (prefix + i)),
+        label: String(t.label || ''),
+        acc: Math.max(0, Number(t.acc) || 0),
+        run: t.run ? Number(t.run) : null,
+        c: (typeof t.c === 'number' && t.c >= 0) ? Math.floor(t.c) % 10 : i % 10
+      };
+    });
+  }
+
   function normDay(raw) {
     raw = raw || {};
-    var tasks = Array.isArray(raw.tasks) ? raw.tasks.slice(0, MAX) : [];
     return {
       name: String(raw.name || 'Journée'),
       createdAt: Number(raw.createdAt) || Date.now(),
-      tasks: tasks.map(function (t, i) {
-        return {
-          id: String(t.id || ('t' + i)),
-          label: String(t.label || ''),
-          acc: Math.max(0, Number(t.acc) || 0),
-          run: t.run ? Number(t.run) : null,
-          c: (typeof t.c === 'number' && t.c >= 0) ? Math.floor(t.c) % 10 : i % 10
-        };
-      })
+      real: raw.real === true,
+      actAcc: Math.max(0, Number(raw.actAcc) || 0),
+      actSince: raw.actSince ? Number(raw.actSince) : null,
+      tasks: normItems(raw.tasks, 't'),
+      moods: normItems(raw.moods, 'm')
     };
   }
 
@@ -381,6 +420,7 @@ button { cursor: pointer; }
     days = next;
     ready = true;
     reconcileSel();
+    fixDays();
     safeRender();
   }
 
@@ -433,14 +473,72 @@ button { cursor: pointer; }
     });
   }
 
+  /* ---------- running state and cumulative time ---------- */
+  function anyRunning(d) {
+    return d.tasks.some(function (t) { return t.run; }) || d.moods.some(function (t) { return t.run; });
+  }
+  function stopItem(t, at) {
+    if (t.run) { t.acc += Math.max(0, at - t.run); t.run = null; }
+  }
+  function sumOf(list, at) {
+    var s = 0;
+    list.forEach(function (t) { s += elapsed(t, at); });
+    return s;
+  }
+  /* Runs fn(at) and keeps the real cumulative time in step: it counts only the periods
+     when at least one counter runs. Days made before this feature (real = false) keep the sum. */
+  function mutate(d, fn) {
+    var at = Date.now();
+    var before = anyRunning(d);
+    fn(at);
+    var after = anyRunning(d);
+    if (d.real) {
+      if (!before && after) d.actSince = at;
+      else if (before && !after) {
+        if (d.actSince) d.actAcc += Math.max(0, at - d.actSince);
+        d.actSince = null;
+      }
+    }
+  }
+  function cumul(d, at) {
+    if (!d.real) return sumOf(d.tasks, at) + sumOf(d.moods, at);
+    return d.actAcc + (d.actSince ? Math.max(0, at - d.actSince) : 0);
+  }
+  /* One running counter per type: older days may hold several, so keep the latest and stop the rest. */
+  function fixDays() {
+    if (!adapter) return;
+    var at = Date.now();
+    Object.keys(days).forEach(function (id) {
+      var d = days[id];
+      var changed = false;
+      TYPES.forEach(function (k) {
+        var runners = d[k].filter(function (t) { return t.run; });
+        if (runners.length > 1) {
+          var keep = runners.reduce(function (a, b) { return b.run > a.run ? b : a; });
+          runners.forEach(function (t) { if (t !== keep) stopItem(t, at); });
+          changed = true;
+        }
+      });
+      if (d.real) {
+        var starts = d.tasks.concat(d.moods).filter(function (t) { return t.run; }).map(function (t) { return t.run; });
+        if (starts.length && !d.actSince) { d.actSince = Math.min.apply(null, starts); changed = true; }
+        else if (!starts.length && d.actSince) { d.actSince = null; changed = true; }
+      }
+      if (changed) save(id);
+    });
+  }
+  function findItem(d, type, id) {
+    return d[type].filter(function (x) { return x.id === id; })[0];
+  }
+
   /* ---------- actions ---------- */
   function selectDay(id) {
-    selId = id; creating = false; dayArmed = false; pendingTask = null;
+    selId = id; creating = false; dayArmed = false; pendingItem = null;
     lsSet(SELKEY, id);
     render();
   }
   function openNew() {
-    creating = true; dayArmed = false; pendingTask = null;
+    creating = true; dayArmed = false; pendingItem = null;
     render();
     var inp = $('newDayName');
     inp.value = cap(dateStr(Date.now()));
@@ -450,12 +548,12 @@ button { cursor: pointer; }
   function createDay() {
     var raw = $('newDayName').value.trim().slice(0, 60);
     var id = 'd-' + uid();
-    days[id] = { name: raw || cap(dateStr(Date.now())), createdAt: Date.now(), tasks: [] };
+    days[id] = { name: raw || cap(dateStr(Date.now())), createdAt: Date.now(), real: true, actAcc: 0, actSince: null, tasks: [], moods: [] };
     selId = id; creating = false;
     lsSet(SELKEY, id);
     save(id);
     render();
-    setTimeout(function () { $('taskName').focus(); }, 0);
+    setTimeout(function () { $('tasksName').focus(); }, 0);
   }
   function removeDay(id) {
     delete days[id];
@@ -464,39 +562,48 @@ button { cursor: pointer; }
     enqueue(function () { return adapter.remove(id); });
     render();
   }
-  function nextColor(d) {
+  function nextColor(list) {
     var used = {};
-    d.tasks.forEach(function (t) { used[t.c] = true; });
+    list.forEach(function (t) { used[t.c] = true; });
     for (var i = 0; i < 10; i++) if (!used[i]) return i;
-    return d.tasks.length % 10;
+    return list.length % 10;
   }
-  function addTask() {
+  function addItem(type) {
     var d = days[selId];
     if (!d) return;
-    var inp = $('taskName');
+    var inp = $(type + 'Name');
     var label = inp.value.trim().slice(0, 40);
     if (!label) { inp.focus(); return; }
-    if (d.tasks.length >= MAX) return;
-    d.tasks.push({ id: 't' + uid(), label: label, acc: 0, run: null, c: nextColor(d) });
+    if (d[type].length >= MAX) return;
+    mutate(d, function (at) {
+      d[type].forEach(function (x) { stopItem(x, at); });
+      d[type].push({ id: KIND[type].prefix + uid(), label: label, acc: 0, run: at, c: nextColor(d[type]) });
+    });
     inp.value = '';
     save(selId);
     render();
     inp.focus();
   }
-  function toggle(taskId) {
+  function toggle(type, itemId) {
     var d = days[selId];
     if (!d) return;
-    var t = d.tasks.filter(function (x) { return x.id === taskId; })[0];
+    var t = findItem(d, type, itemId);
     if (!t) return;
-    var at = Date.now();
-    if (t.run) { t.acc += Math.max(0, at - t.run); t.run = null; } else { t.run = at; }
+    mutate(d, function (at) {
+      if (t.run) {
+        stopItem(t, at);
+      } else {
+        d[type].forEach(function (x) { if (x !== t) stopItem(x, at); });
+        t.run = at;
+      }
+    });
     save(selId);
     render();
   }
-  function adjust(taskId, sign) {
+  function adjust(type, itemId, sign) {
     var d = days[selId];
     if (!d) return;
-    var t = d.tasks.filter(function (x) { return x.id === taskId; })[0];
+    var t = findItem(d, type, itemId);
     if (!t) return;
     var at = Date.now();
     var next = Math.max(0, elapsed(t, at) + sign * stepMin * 60000);
@@ -506,20 +613,20 @@ button { cursor: pointer; }
     render();
   }
   function stopAll() {
-    var at = Date.now();
     Object.keys(days).forEach(function (id) {
-      var changed = false;
-      days[id].tasks.forEach(function (t) {
-        if (t.run) { t.acc += Math.max(0, at - t.run); t.run = null; changed = true; }
+      var d = days[id];
+      if (!anyRunning(d)) return;
+      mutate(d, function (at) {
+        TYPES.forEach(function (k) { d[k].forEach(function (t) { stopItem(t, at); }); });
       });
-      if (changed) save(id);
+      save(id);
     });
     render();
   }
-  function renameTask(taskId, input) {
+  function renameItem(type, itemId, input) {
     var d = days[selId];
     if (!d) return;
-    var t = d.tasks.filter(function (x) { return x.id === taskId; })[0];
+    var t = findItem(d, type, itemId);
     if (!t) return;
     var v = input.value.trim().slice(0, 40);
     if (!v) { input.value = t.label; return; }
@@ -527,23 +634,25 @@ button { cursor: pointer; }
     t.label = v;
     save(selId);
   }
-  function askDelete(taskId) {
-    pendingTask = taskId; dayArmed = false;
+  function askDelete(type, itemId) {
+    pendingItem = { type: type, id: itemId }; dayArmed = false;
     clearTimeout(armTimer);
     armTimer = setTimeout(cancelArm, 6000);
     render();
   }
-  function removeTask(taskId) {
+  function removeItem(type, itemId) {
     var d = days[selId];
     if (!d) return;
-    d.tasks = d.tasks.filter(function (x) { return x.id !== taskId; });
-    pendingTask = null;
+    mutate(d, function () {
+      d[type] = d[type].filter(function (x) { return x.id !== itemId; });
+    });
+    pendingItem = null;
     save(selId);
     render();
   }
   function cancelArm() {
     clearTimeout(armTimer);
-    pendingTask = null; dayArmed = false;
+    pendingItem = null; dayArmed = false;
     render();
   }
 
@@ -554,7 +663,7 @@ button { cursor: pointer; }
     ids.forEach(function (id) {
       var d = days[id];
       var on = id === selId && !creating;
-      var live = d.tasks.some(function (t) { return t.run; });
+      var live = anyRunning(d);
       box.appendChild(h('button', {
         type: 'button', 'class': 'chip' + (on ? ' on' : ''), role: 'tab',
         'aria-selected': on ? 'true' : 'false',
@@ -569,24 +678,17 @@ button { cursor: pointer; }
     }, ['+ Nouvelle journée']));
   }
 
-  function renderDay() {
-    var d = selId && days[selId];
-    var show = !!d && !creating;
-    $('dayView').hidden = !show;
-    if (!show) { taskEls = {}; return; }
+  function plural(n, w) { return n + ' ' + w + (n > 1 ? 's' : ''); }
 
-    var nameIn = $('dayName');
-    if (document.activeElement !== nameIn) nameIn.value = d.name;
-    var n = d.tasks.length;
-    $('dayMeta').textContent = cap(dateStr(d.createdAt)) + ' · ' + n + ' tâche' + (n > 1 ? 's' : '');
-
-    var list = $('tasks');
-    var bar = $('bar');
+  function renderSection(d, type) {
+    var K = KIND[type];
+    var list = $(type + 'List');
+    var bar = $(type + 'Bar');
     list.textContent = '';
     bar.textContent = '';
-    taskEls = {};
+    var items = d[type];
 
-    d.tasks.forEach(function (t) {
+    items.forEach(function (t) {
       var on = !!t.run;
       var timeEl = h('div', { 'class': 'time', text: '0:00:00' });
       var pctEl = h('span', { 'class': 'pct' });
@@ -598,15 +700,15 @@ button { cursor: pointer; }
       var playBtn = h('button', {
         type: 'button', 'class': 'play' + (on ? ' on' : ''),
         'aria-pressed': on ? 'true' : 'false',
-        'aria-label': (on ? 'Arrêter ' : 'Démarrer ') + (t.label || 'la tâche'),
-        onclick: function () { toggle(t.id); }
+        'aria-label': (on ? 'Arrêter ' : 'Démarrer ') + (t.label || K.fallback),
+        onclick: function () { toggle(type, t.id); }
       });
       playBtn.innerHTML = on ? PAUSE : PLAY;
 
       var input = h('input', {
         type: 'text', 'class': 'label', value: t.label, maxlength: '40',
-        'aria-label': 'Nom de la tâche', autocomplete: 'off',
-        onchange: function (e) { renameTask(t.id, e.target); }
+        'aria-label': K.nameAria, autocomplete: 'off',
+        onchange: function (e) { renameItem(type, t.id, e.target); }
       });
       var dot = h('span', { 'class': 'dot' });
       dot.style.background = 'var(--c' + t.c + ')';
@@ -616,38 +718,55 @@ button { cursor: pointer; }
         h('div', { 'class': 'main' }, [input, h('div', { 'class': 'sub' }, [dot, pctEl])]),
         timeEl,
         h('button', {
-          type: 'button', 'class': 'del', 'aria-label': 'Supprimer ' + (t.label || 'la tâche'),
-          text: '×', onclick: function () { askDelete(t.id); }
+          type: 'button', 'class': 'del', 'aria-label': 'Supprimer ' + (t.label || K.fallback),
+          text: '×', onclick: function () { askDelete(type, t.id); }
         }),
         h('div', { 'class': 'adj' }, [
           h('button', {
             type: 'button', 'class': 'adj-btn', text: '−',
-            'aria-label': 'Retirer ' + stepMin + ' minutes à ' + (t.label || 'la tâche'),
-            onclick: function () { adjust(t.id, -1); }
+            'aria-label': 'Retirer ' + stepMin + ' minutes à ' + (t.label || K.fallback),
+            onclick: function () { adjust(type, t.id, -1); }
           }),
           h('button', {
             type: 'button', 'class': 'adj-btn', text: '+',
-            'aria-label': 'Ajouter ' + stepMin + ' minutes à ' + (t.label || 'la tâche'),
-            onclick: function () { adjust(t.id, 1); }
+            'aria-label': 'Ajouter ' + stepMin + ' minutes à ' + (t.label || K.fallback),
+            onclick: function () { adjust(type, t.id, 1); }
           })
         ])
       ]);
-      if (pendingTask === t.id) {
+      if (pendingItem && pendingItem.type === type && pendingItem.id === t.id) {
         li.appendChild(h('div', { 'class': 'confirm' }, [
-          h('span', { text: 'Supprimer cette tâche ?' }),
-          h('button', { type: 'button', 'class': 'btn danger', text: 'Supprimer', onclick: function () { removeTask(t.id); } }),
+          h('span', { text: K.confirm }),
+          h('button', { type: 'button', 'class': 'btn danger', text: 'Supprimer', onclick: function () { removeItem(type, t.id); } }),
           h('button', { type: 'button', 'class': 'btn', text: 'Annuler', onclick: cancelArm })
         ]));
       }
       list.appendChild(li);
-      taskEls[t.id] = { time: timeEl, pct: pctEl, seg: seg };
+      itemEls[t.id] = { time: timeEl, pct: pctEl, seg: seg };
     });
 
-    var full = n >= MAX;
-    $('noTasks').hidden = n > 0;
-    $('taskName').disabled = full;
-    $('addBtn').disabled = full;
-    $('limitNote').hidden = !full;
+    var full = items.length >= MAX;
+    $(type + 'Empty').hidden = items.length > 0;
+    $(type + 'Name').disabled = full;
+    $(type + 'AddBtn').disabled = full;
+    $(type + 'Limit').hidden = !full;
+  }
+
+  function renderDay() {
+    var d = selId && days[selId];
+    var show = !!d && !creating;
+    $('dayView').hidden = !show;
+    if (!show) { itemEls = {}; return; }
+
+    var nameIn = $('dayName');
+    if (document.activeElement !== nameIn) nameIn.value = d.name;
+    $('dayMeta').textContent = cap(dateStr(d.createdAt)) + ' · ' + plural(d.tasks.length, 'tâche') + ' · ' + plural(d.moods.length, 'mood');
+    $('realNote').hidden = !d.real;
+    $('legacyNote').hidden = d.real;
+
+    itemEls = {};
+    TYPES.forEach(function (type) { renderSection(d, type); });
+
     $('dayDelete').hidden = dayArmed;
     $('dayConfirm').hidden = !dayArmed;
   }
@@ -671,7 +790,7 @@ button { cursor: pointer; }
 
     var n = 0;
     Object.keys(days).forEach(function (id) {
-      days[id].tasks.forEach(function (t) { if (t.run) n++; });
+      TYPES.forEach(function (k) { days[id][k].forEach(function (t) { if (t.run) n++; }); });
     });
     running = n > 0;
     $('stopAll').disabled = n === 0;
@@ -689,30 +808,44 @@ button { cursor: pointer; }
     render();
   }
 
+  function setText(id, v) {
+    var e = $(id);
+    if (e.textContent !== v) e.textContent = v;
+  }
+
   function tick() {
     var d = selId && days[selId];
     if (!d || $('dayView').hidden) return;
     var at = Date.now();
-    var total = 0;
-    var ms = d.tasks.map(function (t) { var v = elapsed(t, at); total += v; return v; });
-    var totalText = fmt(total);
-    if ($('total').textContent !== totalText) $('total').textContent = totalText;
-    d.tasks.forEach(function (t, i) {
-      var el = taskEls[t.id];
-      if (!el) return;
-      var tt = fmt(ms[i]);
-      if (el.time.textContent !== tt) el.time.textContent = tt;
-      var pt = total > 0 ? Math.round(ms[i] / total * 100) + ' %' : '0 %';
-      if (el.pct.textContent !== pt) el.pct.textContent = pt;
-      el.seg.hidden = ms[i] <= 0;
-      el.seg.style.flexGrow = String(ms[i]);
+    var totals = {};
+    var ms = {};
+    TYPES.forEach(function (k) {
+      var tot = 0;
+      ms[k] = d[k].map(function (t) { var v = elapsed(t, at); tot += v; return v; });
+      totals[k] = tot;
+    });
+    setText('total', fmt(cumul(d, at)));
+    setText('totalTasks', fmt(totals.tasks));
+    setText('totalMoods', fmt(totals.moods));
+    TYPES.forEach(function (k) {
+      d[k].forEach(function (t, i) {
+        var el = itemEls[t.id];
+        if (!el) return;
+        setText2(el.time, fmt(ms[k][i]));
+        setText2(el.pct, totals[k] > 0 ? Math.round(ms[k][i] / totals[k] * 100) + ' %' : '0 %');
+        el.seg.hidden = ms[k][i] <= 0;
+        el.seg.style.flexGrow = String(ms[k][i]);
+      });
     });
   }
+  function setText2(el, v) { if (el.textContent !== v) el.textContent = v; }
 
   /* ---------- wiring ---------- */
   $('newForm').addEventListener('submit', function (e) { e.preventDefault(); createDay(); });
   $('newCancel').addEventListener('click', function () { creating = false; render(); });
-  $('addForm').addEventListener('submit', function (e) { e.preventDefault(); addTask(); });
+  TYPES.forEach(function (k) {
+    $(k + 'Form').addEventListener('submit', function (e) { e.preventDefault(); addItem(k); });
+  });
   $('stopAll').addEventListener('click', stopAll);
   (function () {
     var saved = parseInt(lsGet(STEPKEY), 10);
@@ -727,7 +860,7 @@ button { cursor: pointer; }
     });
   })();
   $('dayDelete').addEventListener('click', function () {
-    dayArmed = true; pendingTask = null;
+    dayArmed = true; pendingItem = null;
     clearTimeout(armTimer);
     armTimer = setTimeout(cancelArm, 8000);
     render();
@@ -767,6 +900,7 @@ button { cursor: pointer; }
       adapter = localAdapter();
       applyIncoming(adapter.initial);
     }
+    fixDays();
     render();
   })();
 })();

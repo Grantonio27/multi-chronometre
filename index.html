@@ -15,20 +15,20 @@
 <style>
 /* Layout: one narrow column for a phone held in one hand. Day chips on top, a summary of where the time went, one large-target row per task, and a fixed "Tout arrêter" bar at the bottom. */
 :root {
-  --bg: #EDF1F0;
+  --bg: #EAF0F6;
   --surface: #FFFFFF;
-  --surface-2: #E1E8E6;
-  --fg: #10201C;
-  --muted: #53655F;
-  --line: #CFD9D6;
-  --accent: #0B6B5D;
+  --surface-2: #DCE5EE;
+  --fg: #0E1F33;
+  --muted: #4F6178;
+  --line: #C9D5E2;
+  --accent: #1456A6;
   --on-accent: #FFFFFF;
-  --accent-soft: #DDF0EB;
+  --accent-soft: #DCE9F7;
   --danger: #B42318;
   --on-danger: #FFFFFF;
-  --stop: #10201C;
-  --on-stop: #EDF1F0;
-  --c0: #1971C2; --c1: #D9480F; --c2: #C2255C; --c3: #5C940D; --c4: #7048E8;
+  --stop: #0E1F33;
+  --on-stop: #EAF0F6;
+  --c0: #2B8BD9; --c1: #D9480F; --c2: #C2255C; --c3: #5C940D; --c4: #7048E8;
   --c5: #1098AD; --c6: #E08A00; --c7: #E03131; --c8: #8D5524; --c9: #64748B;
   --display: "Bricolage Grotesque", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --body: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -36,19 +36,19 @@
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0D1412; --surface: #151F1C; --surface-2: #22302C; --fg: #E4EEEA; --muted: #8CA29B; --line: #2B3B36;
-    --accent: #3CC7A9; --on-accent: #06231D; --accent-soft: #12302A;
-    --danger: #FF8C82; --on-danger: #1A0907; --stop: #E4EEEA; --on-stop: #0D1412;
-    --c0: #6EA8FE; --c1: #FF8A4C; --c2: #FF7AA8; --c3: #A5D55A; --c4: #A78BFA;
+    --bg: #0A1320; --surface: #111D2E; --surface-2: #1B2A40; --fg: #E3ECF7; --muted: #8DA2BC; --line: #243650;
+    --accent: #5AA2F0; --on-accent: #06182E; --accent-soft: #112A47;
+    --danger: #FF8C82; --on-danger: #1A0907; --stop: #E3ECF7; --on-stop: #0A1320;
+    --c0: #8FC7FF; --c1: #FF8A4C; --c2: #FF7AA8; --c3: #A5D55A; --c4: #A78BFA;
     --c5: #4DD0E1; --c6: #FFC040; --c7: #FF6B6B; --c8: #D2A06F; --c9: #94A3B8;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #0D1412; --surface: #151F1C; --surface-2: #22302C; --fg: #E4EEEA; --muted: #8CA29B; --line: #2B3B36;
-  --accent: #3CC7A9; --on-accent: #06231D; --accent-soft: #12302A;
-  --danger: #FF8C82; --on-danger: #1A0907; --stop: #E4EEEA; --on-stop: #0D1412;
-  --c0: #6EA8FE; --c1: #FF8A4C; --c2: #FF7AA8; --c3: #A5D55A; --c4: #A78BFA;
+  --bg: #0A1320; --surface: #111D2E; --surface-2: #1B2A40; --fg: #E3ECF7; --muted: #8DA2BC; --line: #243650;
+  --accent: #5AA2F0; --on-accent: #06182E; --accent-soft: #112A47;
+  --danger: #FF8C82; --on-danger: #1A0907; --stop: #E3ECF7; --on-stop: #0A1320;
+  --c0: #8FC7FF; --c1: #FF8A4C; --c2: #FF7AA8; --c3: #A5D55A; --c4: #A78BFA;
   --c5: #4DD0E1; --c6: #FFC040; --c7: #FF6B6B; --c8: #D2A06F; --c9: #94A3B8;
   color-scheme: dark;
 }

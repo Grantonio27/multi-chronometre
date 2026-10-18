@@ -214,19 +214,6 @@ button { cursor: pointer; }
       <p class="day-meta" id="dayMeta"></p>
     </div>
 
-    <div class="summary">
-      <div class="total-line">
-        <span class="lbl">Temps cumulé</span>
-        <span class="total" id="total">0:00:00</span>
-      </div>
-      <div class="figs">
-        <div class="fig"><span class="lbl">Tâches</span><span class="val" id="totalTasks">0:00:00</span></div>
-        <div class="fig"><span class="lbl">Moods</span><span class="val" id="totalMoods">0:00:00</span></div>
-      </div>
-      <p class="fine" id="realNote">Le temps cumulé compte une seule fois les moments où une tâche et un mood tournent en même temps. Les ajustements avec + et − n’y sont pas ajoutés.</p>
-      <p class="fine" id="legacyNote" hidden>Cette journée date d’avant le calcul du temps réel : son cumul additionne tous les chronos.</p>
-    </div>
-
     <section class="sec" aria-labelledby="tasksTitle">
       <h2 class="sec-title" id="tasksTitle">Tâches</h2>
       <div class="bar" id="tasksBar" role="img" aria-label="Répartition du temps entre les tâches"></div>
@@ -250,6 +237,19 @@ button { cursor: pointer; }
       </form>
       <p class="fine" id="moodsLimit" hidden>10 moods maximum par journée. Supprime-en un pour en ajouter un autre.</p>
     </section>
+
+    <div class="summary">
+      <div class="total-line">
+        <span class="lbl">Temps cumulé</span>
+        <span class="total" id="total">0:00:00</span>
+      </div>
+      <div class="figs">
+        <div class="fig"><span class="lbl">Tâches</span><span class="val" id="totalTasks">0:00:00</span></div>
+        <div class="fig"><span class="lbl">Moods</span><span class="val" id="totalMoods">0:00:00</span></div>
+      </div>
+      <p class="fine" id="realNote">Le temps cumulé compte une seule fois les moments où une tâche et un mood tournent en même temps. Les ajustements avec + et − n’y sont pas ajoutés.</p>
+      <p class="fine" id="legacyNote" hidden>Cette journée date d’avant le calcul du temps réel : son cumul additionne tous les chronos.</p>
+    </div>
 
     <div class="day-actions">
       <button class="link" type="button" id="dayDelete">Supprimer cette journée</button>

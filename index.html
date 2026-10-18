@@ -1,9 +1,6 @@
-<!doctype html>
-<html lang="fr">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>Multi-chronomètre</title>
+<meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
@@ -121,7 +118,22 @@ button { cursor: pointer; }
 .time { font: 600 20px/1 var(--mono); font-variant-numeric: tabular-nums; letter-spacing: -.02em; white-space: nowrap; }
 .task.run .time { color: var(--accent); }
 .del { width: 36px; height: 36px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font-size: 22px; line-height: 1; }
-.confirm { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 14px; }
+/* Task grid placement: play button spans two rows, adjust buttons sit on the second row */
+.task > .play { grid-column: 1; grid-row: 1 / span 2; }
+.task > .main { grid-column: 2; grid-row: 1; }
+.task > .time { grid-column: 3; grid-row: 1; }
+.task > .del { grid-column: 4; grid-row: 1; }
+.adj { grid-column: 2 / -1; grid-row: 2; display: flex; align-items: center; gap: 8px; }
+.adj-btn { width: 56px; height: 38px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); color: var(--fg); font: 600 22px/1 var(--mono); display: inline-flex; align-items: center; justify-content: center; }
+.adj-btn:active { background: var(--line); }
+.task.run .adj-btn { background: var(--surface); border-color: var(--accent); }
+
+/* Adjustment step selector, second row of the page */
+.adjbar { display: flex; align-items: center; gap: 12px; margin-top: 2px; }
+.adjbar label { font-size: 13px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); }
+.adjbar select { min-height: 44px; padding: 0 34px 0 14px; border: 1px solid var(--line); border-radius: 10px; background-color: var(--surface); color: var(--fg); font: 500 15px var(--body); }
+
+.confirm { grid-column: 1 / -1; grid-row: 3; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 14px; }
 .confirm > span { flex: 1 1 150px; }
 .confirm .btn { min-height: 40px; }
 
@@ -152,17 +164,21 @@ button { cursor: pointer; }
 }
 </style>
 
-<style>
-:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
-body{margin:0}
-[hidden]{display:none!important}
-</style>
-</head>
-<body>
 <main class="wrap">
   <header>
     <p class="eyebrow">Multi-chronomètre</p>
     <div class="chips" id="chips" role="tablist" aria-label="Journées"></div>
+    <div class="adjbar">
+      <label for="stepSel">Ajustement</label>
+      <select id="stepSel" aria-label="Minutes ajoutées ou retirées par les boutons + et −">
+        <option value="5">5 minutes</option>
+        <option value="10">10 minutes</option>
+        <option value="15">15 minutes</option>
+        <option value="20">20 minutes</option>
+        <option value="30">30 minutes</option>
+        <option value="60">60 minutes</option>
+      </select>
+    </div>
   </header>
 
   <p class="toast" id="toast" role="status" hidden></p>
@@ -241,6 +257,9 @@ body{margin:0}
   var MAX = 10;
   var KEY = 'multichrono.v1';
   var SELKEY = 'multichrono.sel';
+  var STEPKEY = 'multichrono.step';
+  var STEPS = [5, 10, 15, 20, 30, 60];
+  var stepMin = 5;
   var PLAY = '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M7 4.5v15l12.5-7.5z" fill="currentColor"/></svg>';
   var PAUSE = '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><rect x="6" y="5" width="4.2" height="14" rx="1" fill="currentColor"/><rect x="13.8" y="5" width="4.2" height="14" rx="1" fill="currentColor"/></svg>';
 
@@ -474,6 +493,18 @@ body{margin:0}
     save(selId);
     render();
   }
+  function adjust(taskId, sign) {
+    var d = days[selId];
+    if (!d) return;
+    var t = d.tasks.filter(function (x) { return x.id === taskId; })[0];
+    if (!t) return;
+    var at = Date.now();
+    var next = Math.max(0, elapsed(t, at) + sign * stepMin * 60000);
+    if (t.run) t.run = at;
+    t.acc = next;
+    save(selId);
+    render();
+  }
   function stopAll() {
     var at = Date.now();
     Object.keys(days).forEach(function (id) {
@@ -587,7 +618,19 @@ body{margin:0}
         h('button', {
           type: 'button', 'class': 'del', 'aria-label': 'Supprimer ' + (t.label || 'la tâche'),
           text: '×', onclick: function () { askDelete(t.id); }
-        })
+        }),
+        h('div', { 'class': 'adj' }, [
+          h('button', {
+            type: 'button', 'class': 'adj-btn', text: '−',
+            'aria-label': 'Retirer ' + stepMin + ' minutes à ' + (t.label || 'la tâche'),
+            onclick: function () { adjust(t.id, -1); }
+          }),
+          h('button', {
+            type: 'button', 'class': 'adj-btn', text: '+',
+            'aria-label': 'Ajouter ' + stepMin + ' minutes à ' + (t.label || 'la tâche'),
+            onclick: function () { adjust(t.id, 1); }
+          })
+        ])
       ]);
       if (pendingTask === t.id) {
         li.appendChild(h('div', { 'class': 'confirm' }, [
@@ -671,6 +714,18 @@ body{margin:0}
   $('newCancel').addEventListener('click', function () { creating = false; render(); });
   $('addForm').addEventListener('submit', function (e) { e.preventDefault(); addTask(); });
   $('stopAll').addEventListener('click', stopAll);
+  (function () {
+    var saved = parseInt(lsGet(STEPKEY), 10);
+    if (STEPS.indexOf(saved) !== -1) stepMin = saved;
+    $('stepSel').value = String(stepMin);
+    $('stepSel').addEventListener('change', function (e) {
+      var v = parseInt(e.target.value, 10);
+      if (STEPS.indexOf(v) === -1) return;
+      stepMin = v;
+      lsSet(STEPKEY, String(v));
+      render();
+    });
+  })();
   $('dayDelete').addEventListener('click', function () {
     dayArmed = true; pendingTask = null;
     clearTimeout(armTimer);
@@ -716,5 +771,4 @@ body{margin:0}
   })();
 })();
 </script>
-</body>
-</html>
+</body></html>

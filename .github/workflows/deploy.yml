@@ -1,0 +1,65 @@
+name: Deploy GitHub Pages
+
+on:
+  push:
+    branches:
+      - main        # Déclenche l'ACC
+      - production  # Déclenche la PRD
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: 'pages'
+  cancel-in-progress: true
+
+jobs:
+  # Job pour l'environnement ACC (branche main)
+  deploy-acc:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: ACC
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Structurer le sous-dossier ACC
+        run: |
+          mkdir -p build/ACC
+          # Copie tout le contenu (sauf le dossier build lui-même) dans build/ACC
+          rsync -av --exclude='build' ./ build/ACC/
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: './build'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+  # Job pour l'environnement PRD (branche production)
+  deploy-prd:
+    if: github.ref == 'refs/heads/production'
+    runs-on: ubuntu-latest
+    environment: PRD
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact (racine)
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

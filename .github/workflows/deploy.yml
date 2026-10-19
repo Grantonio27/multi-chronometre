@@ -22,19 +22,30 @@ jobs:
     runs-on: ubuntu-latest
     environment: ACC
     steps:
-      - name: Checkout code
+      - name: Checkout main (ACC)
         uses: actions/checkout@v4
+        with:
+          path: 'acc_code'
 
-      - name: Structurer le sous-dossier ACC
+      - name: Checkout production (PRD)
+        uses: actions/checkout@v4
+        with:
+          ref: 'production'
+          path: 'prd_code'
+        continue-on-error: true # Évite un échec si la branche production n'existe pas encore
+
+      - name: Assembler le site (PRD à la racine + ACC dans /ACC)
         run: |
-          mkdir -p build/ACC
-          # Copie tout le contenu (sauf le dossier build lui-même) dans build/ACC
-          rsync -av --exclude='build' ./ build/ACC/
-
-          # Si aucun index n'existe à la racine de build, crée une redirection vers /ACC/
-          if [ ! -f build/index.html ]; then
-          echo '<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0; url=./ACC/"></head><body></body></html>' > build/index.html
+          mkdir -p build
+          
+          # 1. Copie du contenu de production à la racine s'il existe
+          if [ -d "prd_code" ]; then
+            rsync -av --exclude='.git' prd_code/ build/
           fi
+          
+          # 2. Copie du contenu de main dans le sous-dossier ACC
+          mkdir -p build/ACC
+          rsync -av --exclude='.git' acc_code/ build/ACC/
 
       - name: Setup Pages
         uses: actions/configure-pages@v5

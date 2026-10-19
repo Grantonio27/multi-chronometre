@@ -31,6 +31,11 @@ jobs:
           # Copie tout le contenu (sauf le dossier build lui-même) dans build/ACC
           rsync -av --exclude='build' ./ build/ACC/
 
+          # Si aucun index n'existe à la racine de build, crée une redirection vers /ACC/
+          if [ ! -f build/index.html ]; then
+          echo '<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0; url=./ACC/"></head><body></body></html>' > build/index.html
+          fi
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
 

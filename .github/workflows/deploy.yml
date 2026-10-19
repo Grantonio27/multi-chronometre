@@ -3,8 +3,8 @@ name: Deploy GitHub Pages
 on:
   push:
     branches:
-      - main        # Déclenche l'ACC
-      - production  # Déclenche la PRD
+      - main        # met à jour /ACC/
+      - production  # met à jour la racine
 
 permissions:
   contents: read
@@ -13,37 +13,36 @@ permissions:
 
 concurrency:
   group: 'pages'
-  cancel-in-progress: true
+  cancel-in-progress: false   # évite d'annuler un déploiement en cours
 
 jobs:
-  # Job pour l'environnement ACC (branche main)
-  deploy-acc:
-    if: github.ref == 'refs/heads/main'
+  deploy:
     runs-on: ubuntu-latest
-    environment: ACC
+    environment: ${{ github.ref == 'refs/heads/production' && 'PRD' || 'ACC' }}
     steps:
       - name: Checkout main (ACC)
         uses: actions/checkout@v4
         with:
-          path: 'acc_code'
+          ref: main
+          path: acc_code
 
       - name: Checkout production (PRD)
         uses: actions/checkout@v4
         with:
-          ref: 'production'
-          path: 'prd_code'
-        continue-on-error: true # Évite un échec si la branche production n'existe pas encore
+          ref: production
+          path: prd_code
+        continue-on-error: true   # la branche production peut ne pas exister encore
 
       - name: Assembler le site (PRD à la racine + ACC dans /ACC)
         run: |
           mkdir -p build
-          
-          # 1. Copie du contenu de production à la racine s'il existe
-          if [ -d "prd_code" ]; then
+
+          # 1. Production à la racine, si la branche existe
+          if git -C prd_code rev-parse HEAD >/dev/null 2>&1; then
             rsync -av --exclude='.git' prd_code/ build/
           fi
-          
-          # 2. Copie du contenu de main dans le sous-dossier ACC
+
+          # 2. Main dans /ACC
           mkdir -p build/ACC
           rsync -av --exclude='.git' acc_code/ build/ACC/
 
@@ -54,27 +53,6 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: './build'
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
-
-  # Job pour l'environnement PRD (branche production)
-  deploy-prd:
-    if: github.ref == 'refs/heads/production'
-    runs-on: ubuntu-latest
-    environment: PRD
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-
-      - name: Upload artifact (racine)
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: '.'
 
       - name: Deploy to GitHub Pages
         id: deployment

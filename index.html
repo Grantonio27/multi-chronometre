@@ -155,6 +155,15 @@ button { cursor: pointer; }
 .sec { display: grid; gap: 12px; }
 .sec-title { margin: 0; font: 700 22px/1.15 var(--display); text-wrap: balance; }
 
+.panel.data { display: grid; gap: 12px; }
+.panel.data h2, .panel.data p { margin: 0; }
+.panel.data .fine { font-size: 13px; }
+.panel.data .review p { color: var(--fg); }
+.import-box { display: grid; gap: 10px; padding-top: 12px; border-top: 1px solid var(--line); }
+.paste { width: 100%; min-height: 110px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--fg); font: 13px/1.4 var(--mono); resize: vertical; }
+.review { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--accent); border-radius: 10px; background: var(--accent-soft); }
+.sr-file { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; overflow: hidden; }
+
 .add-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
 .add-form .text { background: var(--surface); }
 .add-form .btn { min-height: 48px; }
@@ -275,6 +284,36 @@ button { cursor: pointer; }
         </div>
       </div>
     </div>
+  </section>
+
+  <section class="panel data" id="dataPanel" aria-labelledby="dataTitle" hidden>
+    <h2 id="dataTitle">Données</h2>
+    <p>Sauvegarde tes journées dans un fichier pour les retrouver si tu réinstalles la page sur ton écran d’accueil.</p>
+    <div class="row">
+      <button class="btn primary" type="button" id="exportBtn">Exporter</button>
+      <button class="btn" type="button" id="copyBtn">Copier les données</button>
+      <button class="btn" type="button" id="importBtn" aria-expanded="false" aria-controls="importBox">Importer</button>
+    </div>
+    <textarea class="paste" id="exportBox" aria-label="Données à copier" readonly hidden></textarea>
+    <div class="import-box" id="importBox" hidden>
+      <div class="row">
+        <button class="btn" type="button" id="pickBtn">Choisir un fichier</button>
+      </div>
+      <label class="lbl" for="pasteBox">Ou colle ici les données copiées</label>
+      <textarea class="paste" id="pasteBox" spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
+      <div class="row">
+        <button class="btn" type="button" id="readBtn">Lire le texte</button>
+      </div>
+      <div class="review" id="importReview" hidden>
+        <p id="importSummary"></p>
+        <div class="row">
+          <button class="btn primary" type="button" id="importGo">Importer</button>
+          <button class="btn" type="button" id="importCancel">Annuler</button>
+        </div>
+      </div>
+    </div>
+    <input class="sr-file" type="file" id="importFile" accept=".json,application/json,text/plain" tabindex="-1" aria-hidden="true">
+    <p class="fine" id="dataMsg" role="status"></p>
   </section>
 
   <p class="foot" id="foot"></p>
@@ -676,6 +715,132 @@ button { cursor: pointer; }
     render();
   }
 
+  /* ---------- export / import ---------- */
+  var pendingImport = null;
+  function say(msg) { $('dataMsg').textContent = msg || ''; }
+  function stamp() {
+    var d = new Date();
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  }
+  /* The export freezes every counter at the export instant, without touching the live page. */
+  function buildExport() {
+    var at = Date.now();
+    var out = { app: 'chronos', version: 1, exportedAt: new Date(at).toISOString(), step: stepMin, days: {} };
+    Object.keys(days).forEach(function (id) {
+      var live = days[id];
+      var d = JSON.parse(JSON.stringify(live));
+      d.actAcc = cumul(live, at);
+      d.actSince = null;
+      TYPES.forEach(function (k) {
+        d[k].forEach(function (t, i) { t.acc = elapsed(live[k][i], at); t.run = null; });
+      });
+      out.days[id] = d;
+    });
+    return out;
+  }
+  function exportText() { return JSON.stringify(buildExport(), null, 2); }
+  function showText(text) {
+    var box = $('exportBox');
+    box.value = text;
+    box.hidden = false;
+    box.focus();
+    box.select();
+    say('Le texte est sélectionné : copie-le avec le menu de ton appareil, puis garde-le dans une note.');
+  }
+  async function doExport() {
+    if (!Object.keys(days).length) { say('Aucune journée à exporter.'); return; }
+    var text = exportText();
+    var name = 'chronos-' + stamp() + '.json';
+    var file = null;
+    try { file = new File([text], name, { type: 'application/json' }); } catch (e) { file = null; }
+    if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: 'Chronos' });
+        say('Export partagé : ' + name + '.');
+        return;
+      } catch (e) {
+        if (e && e.name === 'AbortError') { say('Export annulé.'); return; }
+      }
+    }
+    try {
+      var url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+      var a = document.createElement('a');
+      a.href = url; a.download = name;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+      say('Fichier téléchargé : ' + name + '. S’il n’apparaît pas, utilise « Copier les données ».');
+    } catch (e) { showText(text); }
+  }
+  function doCopy() {
+    if (!Object.keys(days).length) { say('Aucune journée à copier.'); return; }
+    var text = exportText();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () {
+        say('Données copiées. Colle-les dans une note ou un message pour les garder.');
+      }, function () { showText(text); });
+    } else { showText(text); }
+  }
+
+  function parseImport(text) {
+    var raw;
+    try { raw = JSON.parse(text); } catch (e) { return { error: 'Ce texte n’est pas un export de Chronos : le format est illisible.' }; }
+    if (!raw || raw.app !== 'chronos' || !raw.days || typeof raw.days !== 'object' || Array.isArray(raw.days)) {
+      return { error: 'Ce fichier n’est pas un export de Chronos.' };
+    }
+    var ids = Object.keys(raw.days).filter(function (k) { return /^d-[A-Za-z0-9]{1,40}$/.test(k); }).slice(0, 2000);
+    if (!ids.length) return { error: 'Aucune journée trouvée dans ce fichier.' };
+    var map = {}, nt = 0, nm = 0, replaced = 0;
+    ids.forEach(function (id) {
+      var d = normDay(raw.days[id]);
+      d.actSince = null;
+      TYPES.forEach(function (k) { d[k].forEach(function (t) { t.run = null; }); });
+      map[id] = d;
+      nt += d.tasks.length; nm += d.moods.length;
+      if (days[id]) replaced++;
+    });
+    var step = parseInt(raw.step, 10);
+    return { map: map, count: ids.length, tasks: nt, moods: nm, replaced: replaced, step: STEPS.indexOf(step) !== -1 ? step : null };
+  }
+  function closeImport() {
+    pendingImport = null;
+    $('importBox').hidden = true;
+    $('importBtn').setAttribute('aria-expanded', 'false');
+    $('importReview').hidden = true;
+    $('pasteBox').value = '';
+  }
+  function reviewImport(text) {
+    var r = parseImport(text);
+    if (r.error) { pendingImport = null; $('importReview').hidden = true; say(r.error); return; }
+    pendingImport = r;
+    var s = plural(r.count, 'journée') + ', ' + plural(r.tasks, 'tâche') + ', ' + plural(r.moods, 'mood') + '.';
+    if (r.replaced) s += ' ' + (r.replaced > 1 ? r.replaced + ' journées existantes seront remplacées' : '1 journée existante sera remplacée') + ' par celles du fichier. Les autres journées sont gardées.';
+    else s += ' Tes journées actuelles sont gardées.';
+    $('importSummary').textContent = s;
+    $('importReview').hidden = false;
+    say('');
+  }
+  function applyImport() {
+    var r = pendingImport;
+    if (!r) return;
+    Object.keys(r.map).forEach(function (id) { days[id] = r.map[id]; save(id); });
+    if (r.step) { stepMin = r.step; $('stepSel').value = String(r.step); lsSet(STEPKEY, String(r.step)); }
+    creating = false; dayArmed = false; pendingItem = null;
+    if (!selId || !days[selId]) { selId = sortedIds()[0]; }
+    if (selId) lsSet(SELKEY, selId);
+    var n = r.count;
+    closeImport();
+    render();
+    say(plural(n, 'journée') + (n > 1 ? ' importées.' : ' importée.'));
+  }
+  function readFile(file) {
+    if (!file) return;
+    if (file.size > 5000000) { say('Ce fichier est trop gros pour être un export de Chronos.'); return; }
+    var fr = new FileReader();
+    fr.onload = function () { reviewImport(String(fr.result)); };
+    fr.onerror = function () { say('Impossible de lire ce fichier.'); };
+    fr.readAsText(file);
+  }
+
   /* ---------- render ---------- */
   function renderChips(ids) {
     var box = $('chips');
@@ -794,6 +959,7 @@ button { cursor: pointer; }
   function render() {
     var ids = sortedIds();
     $('loading').hidden = ready;
+    $('dataPanel').hidden = !ready;
     var showForm = ready && (creating || ids.length === 0);
     $('newDay').hidden = !showForm;
     $('emptyState').hidden = ids.length > 0;
@@ -867,6 +1033,22 @@ button { cursor: pointer; }
     $(k + 'Form').addEventListener('submit', function (e) { e.preventDefault(); addItem(k); });
   });
   $('stopAll').addEventListener('click', stopAll);
+  $('exportBtn').addEventListener('click', doExport);
+  $('copyBtn').addEventListener('click', doCopy);
+  $('importBtn').addEventListener('click', function () {
+    var open = $('importBox').hidden;
+    if (open) { $('importBox').hidden = false; $('importBtn').setAttribute('aria-expanded', 'true'); say(''); }
+    else closeImport();
+  });
+  $('pickBtn').addEventListener('click', function () { $('importFile').click(); });
+  $('importFile').addEventListener('change', function (e) { readFile(e.target.files && e.target.files[0]); e.target.value = ''; });
+  $('readBtn').addEventListener('click', function () {
+    var t = $('pasteBox').value.trim();
+    if (!t) { say('Colle d’abord les données copiées.'); return; }
+    reviewImport(t);
+  });
+  $('importGo').addEventListener('click', applyImport);
+  $('importCancel').addEventListener('click', closeImport);
   (function () {
     var saved = parseInt(lsGet(STEPKEY), 10);
     if (STEPS.indexOf(saved) !== -1) stepMin = saved;

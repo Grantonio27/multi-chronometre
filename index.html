@@ -225,7 +225,7 @@ button { cursor: pointer; }
         <input class="text" id="newDayName" type="text" maxlength="60" enterkeyhint="done">
       </div>
       <div class="row">
-        <button class="btn primary" type="submit">Créer la journée</button>
+        <button class="btn primary" type="button" id="newCreate">Créer la journée</button>
         <button class="btn" type="button" id="newCancel">Annuler</button>
       </div>
     </form>
@@ -244,7 +244,7 @@ button { cursor: pointer; }
       <p class="empty" id="tasksEmpty" hidden>Aucune tâche pour l’instant. Ajoute la première ci-dessous, par exemple Courriels, Réunion ou Rédaction.</p>
       <form class="add-form" id="tasksForm" autocomplete="off">
         <input class="text" id="tasksName" type="text" maxlength="40" placeholder="Nouvelle tâche (ex. Courriels)" aria-label="Nom de la nouvelle tâche" enterkeyhint="done">
-        <button class="btn primary" type="submit" id="tasksAddBtn">Ajouter</button>
+        <button class="btn primary" type="button" id="tasksAddBtn">Ajouter</button>
       </form>
       <p class="fine" id="tasksLimit" hidden>10 tâches maximum par journée. Supprime-en une pour en ajouter une autre.</p>
     </section>
@@ -256,7 +256,7 @@ button { cursor: pointer; }
       <p class="empty" id="moodsEmpty" hidden>Aucun mood pour l’instant. Ajoute le premier ci-dessous, par exemple Concentré, Fatigué ou Content.</p>
       <form class="add-form" id="moodsForm" autocomplete="off">
         <input class="text" id="moodsName" type="text" maxlength="40" placeholder="Nouveau mood (ex. Concentré)" aria-label="Nom du nouveau mood" enterkeyhint="done">
-        <button class="btn primary" type="submit" id="moodsAddBtn">Ajouter</button>
+        <button class="btn primary" type="button" id="moodsAddBtn">Ajouter</button>
       </form>
       <p class="fine" id="moodsLimit" hidden>10 moods maximum par journée. Supprime-en un pour en ajouter un autre.</p>
     </section>
@@ -755,7 +755,7 @@ button { cursor: pointer; }
     try { file = new File([text], name, { type: 'application/json' }); } catch (e) { file = null; }
     if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
       try {
-        await navigator.share({ files: [file], title: 'Chronos' });
+        await navigator.share({ files: [file] });
         say('Export partagé : ' + name + '.');
         return;
       } catch (e) {
@@ -1027,10 +1027,20 @@ button { cursor: pointer; }
   function setText2(el, v) { if (el.textContent !== v) el.textContent = v; }
 
   /* ---------- wiring ---------- */
-  $('newForm').addEventListener('submit', function (e) { e.preventDefault(); createDay(); });
+  /* Buttons and the Enter key call the actions directly: a sandboxed frame can block form submission. */
+  function bindAction(inputId, buttonId, fn) {
+    $(buttonId).addEventListener('click', function (e) { e.preventDefault(); fn(); });
+    $(inputId).addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); fn(); }
+    });
+  }
+  ['newForm', 'tasksForm', 'moodsForm'].forEach(function (id) {
+    $(id).addEventListener('submit', function (e) { e.preventDefault(); });
+  });
+  bindAction('newDayName', 'newCreate', createDay);
   $('newCancel').addEventListener('click', function () { creating = false; render(); });
   TYPES.forEach(function (k) {
-    $(k + 'Form').addEventListener('submit', function (e) { e.preventDefault(); addItem(k); });
+    bindAction(k + 'Name', k + 'AddBtn', function () { addItem(k); });
   });
   $('stopAll').addEventListener('click', stopAll);
   $('exportBtn').addEventListener('click', doExport);

@@ -845,6 +845,9 @@ button { cursor: pointer; }
   function renderChips(ids) {
     var box = $('chips');
     box.textContent = '';
+    box.appendChild(h('button', {
+      type: 'button', 'class': 'chip add' + (creating ? ' on' : ''), onclick: openNew
+    }, ['+ Nouvelle journée']));
     ids.forEach(function (id) {
       var d = days[id];
       var on = id === selId && !creating;
@@ -858,9 +861,6 @@ button { cursor: pointer; }
         h('span', { 'class': 'chip-t', text: d.name })
       ]));
     });
-    box.appendChild(h('button', {
-      type: 'button', 'class': 'chip add' + (creating ? ' on' : ''), onclick: openNew
-    }, ['+ Nouvelle journée']));
   }
 
   function plural(n, w) { return n + ' ' + w + (n > 1 ? 's' : ''); }

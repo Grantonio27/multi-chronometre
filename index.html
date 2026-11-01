@@ -6,6 +6,9 @@
 <title>Chronos</title>
 <link rel="apple-touch-icon" sizes="180x180" href="chronos-icon.png">
 <link rel="icon" type="image/png" href="chronos-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#EAF0F6" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0A1320" media="(prefers-color-scheme: dark)">
 <style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
 </head>
 <body>
@@ -140,6 +143,15 @@ button { cursor: pointer; }
 .adj-btn:active { background: var(--line); }
 .task.run .adj-btn { background: var(--surface); border-color: var(--accent); }
 
+/* Tutorial on the welcome panel */
+.steps { list-style: none; margin: 18px 0 18px; padding: 0; display: grid; gap: 12px; }
+.steps li { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 12px; align-items: start; }
+.steps p { margin: 0; line-height: 1.45; }
+.steps .n { width: 28px; height: 28px; border-radius: 50%; background: var(--accent); color: var(--on-accent); font: 700 14px/28px var(--mono); text-align: center; }
+.demo-title { margin: 0 0 8px; font-size: 13px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); }
+.demo-note { margin: 8px 0 0; font-size: 13px; color: var(--muted); }
+#demoList .label { margin-left: 0; }
+#emptyState h2 { margin-bottom: 14px; }
 /* Adjustment step selector, second row of the page */
 .adjbar { display: flex; align-items: center; gap: 12px; margin-top: 2px; }
 .adjbar label { font-size: 13px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); }
@@ -217,7 +229,6 @@ button { cursor: pointer; }
   <section class="panel" id="newDay" hidden>
     <div id="emptyState" hidden>
       <h2>Commence ta première journée</h2>
-      <p>Donne-lui un nom, ajoute des tâches au fur et à mesure et lance les chronos. Plusieurs peuvent tourner en même temps.</p>
     </div>
     <form id="newForm" autocomplete="off">
       <div class="field">
@@ -229,6 +240,17 @@ button { cursor: pointer; }
         <button class="btn" type="button" id="newCancel">Annuler</button>
       </div>
     </form>
+    <div id="emptyTuto" hidden>
+      <ol class="steps">
+        <li><span class="n" aria-hidden="true">1</span><p><strong>Crée ta journée et tes tâches.</strong> Nomme ta journée ci-dessus, puis ajoute des tâches comme Courriels, Réunion ou Rédaction. Une tâche démarre dès qu’on la crée.</p></li>
+        <li><span class="n" aria-hidden="true">2</span><p><strong>Change d’activité, le chrono suit.</strong> Quand tu démarres une tâche, la précédente se met en pause. Un seul chrono tourne à la fois.</p></li>
+        <li><span class="n" aria-hidden="true">3</span><p><strong>Corrige au besoin.</strong> Avec les boutons + et −, tu ajoutes ou retires du temps à un chrono si tu as oublié de le démarrer ou de l’arrêter.</p></li>
+      </ol>
+      <p class="demo-title">Essaie ici</p>
+      <ul class="tasks" id="demoList"></ul>
+      <p class="demo-note">Essai seulement : rien n’est enregistré.</p>
+    
+    </div>
   </section>
 
   <section id="dayView" hidden style="display:grid;gap:18px">
@@ -963,6 +985,8 @@ button { cursor: pointer; }
     var showForm = ready && (creating || ids.length === 0);
     $('newDay').hidden = !showForm;
     $('emptyState').hidden = ids.length > 0;
+    $('emptyTuto').hidden = ids.length > 0;
+    if (ids.length > 0) { demo = null; } else if (!demo) { demoReset(); }
     $('newCancel').hidden = ids.length === 0;
     if (showForm && !$('newDayName').value) $('newDayName').value = cap(dateStr(Date.now()));
 
@@ -1093,6 +1117,63 @@ button { cursor: pointer; }
   });
   document.addEventListener('visibilitychange', function () { if (!document.hidden) tick(); });
   setInterval(function () { if (running) tick(); }, 250);
+
+  /* ---------- tutorial demo (never saved, never exported) ---------- */
+  var DEMO_STEP = 5 * 60000;
+  var demo = null;
+  var demoEls = [];
+  function demoInit() {
+    return [{ label: 'Courriels', acc: 0, run: null }, { label: 'Réunion', acc: 0, run: null }];
+  }
+  function demoElapsed(t, at) { return t.acc + (t.run ? Math.max(0, at - t.run) : 0); }
+  function demoToggle(i) {
+    var at = Date.now();
+    var wasOn = !!demo[i].run;
+    demo.forEach(function (t) { if (t.run) { t.acc += Math.max(0, at - t.run); t.run = null; } });
+    if (!wasOn) demo[i].run = at;
+    demoRender();
+  }
+  function demoAdjust(i, dir) {
+    var at = Date.now(), t = demo[i];
+    t.acc = Math.max(0, demoElapsed(t, at) + dir * DEMO_STEP);
+    if (t.run) t.run = at;
+    demoTick();
+  }
+  function demoTick() {
+    var at = Date.now();
+    demo.forEach(function (t, i) { setText2(demoEls[i], fmt(demoElapsed(t, at))); });
+  }
+  function demoRender() {
+    var list = $('demoList');
+    list.textContent = '';
+    demoEls = [];
+    demo.forEach(function (t, i) {
+      var on = !!t.run;
+      var timeEl = h('div', { 'class': 'time', text: '0:00:00' });
+      demoEls.push(timeEl);
+      var playBtn = h('button', {
+        type: 'button', 'class': 'play' + (on ? ' on' : ''), 'aria-pressed': on ? 'true' : 'false',
+        'aria-label': (on ? 'Arrêter ' : 'Démarrer ') + t.label + ' (essai)',
+        onclick: function () { demoToggle(i); }
+      });
+      playBtn.innerHTML = on ? PAUSE : PLAY;
+      list.appendChild(h('li', { 'class': 'task' + (on ? ' run' : '') }, [
+        playBtn,
+        h('div', { 'class': 'main' }, [h('div', { 'class': 'label', text: t.label })]),
+        timeEl,
+        h('span'),
+        h('div', { 'class': 'adj' }, [
+          h('button', { type: 'button', 'class': 'adj-btn', text: '−', 'aria-label': 'Retirer 5 minutes à ' + t.label + ' (essai)', onclick: function () { demoAdjust(i, -1); } }),
+          h('button', { type: 'button', 'class': 'adj-btn', text: '+', 'aria-label': 'Ajouter 5 minutes à ' + t.label + ' (essai)', onclick: function () { demoAdjust(i, 1); } })
+        ])
+      ]));
+    });
+    demoTick();
+  }
+  function demoReset() { demo = demoInit(); demoRender(); }
+  setInterval(function () {
+    if (demo && !$('emptyTuto').hidden && demo.some(function (t) { return t.run; })) demoTick();
+  }, 250);
 
   /* ---------- start ---------- */
   render();

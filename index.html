@@ -143,6 +143,19 @@ button { cursor: pointer; }
 .adj-btn:active { background: var(--line); }
 .task.run .adj-btn { background: var(--surface); border-color: var(--accent); }
 
+/* Mini-window (Document Picture-in-Picture) */
+.pipbtn { flex: none; width: 54px; min-height: 54px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-2); color: var(--fg); display: inline-flex; align-items: center; justify-content: center; }
+.pipbtn.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.pip { padding: 10px; display: grid; gap: 8px; align-content: start; }
+.pip-day { margin: 0 2px; font-size: 12px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pip-msg { margin: 6px 2px; font-size: 14px; color: var(--muted); }
+.pip-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.prow { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 58px; padding: 6px 12px 6px 6px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
+.prow.run { background: var(--accent-soft); border-color: var(--accent); }
+.prow .play { width: 44px; height: 44px; }
+.prow .plabel { min-width: 0; font-size: 15px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prow .time { font-size: 17px; }
+.prow.run .time { color: var(--accent); }
 /* Tutorial on the welcome panel */
 .steps { list-style: none; margin: 18px 0 18px; padding: 0; display: grid; gap: 12px; }
 .steps li { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 12px; align-items: start; }
@@ -344,6 +357,9 @@ button { cursor: pointer; }
 <div class="stopbar">
   <div class="stopbar-in">
     <span class="runcount" id="runCount" aria-live="polite">Aucun chrono en cours</span>
+    <button class="pipbtn" type="button" id="pipBtn" hidden title="Mini-fenêtre toujours visible" aria-label="Ouvrir la mini-fenêtre">
+      <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><rect x="3" y="4.5" width="18" height="15" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="11" y="11" width="8" height="6" rx="1.2" fill="currentColor"/></svg>
+    </button>
     <button class="stop" type="button" id="stopAll" disabled>
       <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/></svg>
       Tout arrêter
@@ -1003,6 +1019,7 @@ button { cursor: pointer; }
       TYPES.forEach(function (k) { days[id][k].forEach(function (t) { if (t.run) n++; }); });
     });
     running = n > 0;
+    pipRender();
     $('stopAll').disabled = n === 0;
     $('runCount').textContent = n === 0 ? 'Aucun chrono en cours' : (n + (n > 1 ? ' chronos en cours' : ' chrono en cours'));
     $('foot').textContent = !ready ? '' : (mode === 'cloud'
@@ -1024,6 +1041,7 @@ button { cursor: pointer; }
   }
 
   function tick() {
+    pipTick();
     var d = selId && days[selId];
     if (!d || $('dayView').hidden) return;
     var at = Date.now();
@@ -1117,6 +1135,81 @@ button { cursor: pointer; }
   });
   document.addEventListener('visibilitychange', function () { if (!document.hidden) tick(); });
   setInterval(function () { if (running) tick(); }, 250);
+
+  /* ---------- mini-window (Document Picture-in-Picture) ---------- */
+  var pipWin = null;
+  var pipEls = {};
+  function pipSupported() { return 'documentPictureInPicture' in window; }
+  function pipSetBtn() { $('pipBtn').classList.toggle('on', !!pipWin); $('pipBtn').setAttribute('aria-label', pipWin ? 'Fermer la mini-fenêtre' : 'Ouvrir la mini-fenêtre'); }
+  function pipClosed() { pipWin = null; pipEls = {}; pipSetBtn(); }
+  function pipRender() {
+    if (!pipWin) return;
+    try {
+      var doc = pipWin.document;
+      var root = doc.getElementById('pipRoot');
+      if (!root) return;
+      root.textContent = '';
+      pipEls = {};
+      var d = selId && days[selId];
+      if (!d || creating) { root.appendChild(h('p', { 'class': 'pip-msg', text: 'Aucune journée sélectionnée.' })); return; }
+      root.appendChild(h('p', { 'class': 'pip-day', text: d.name }));
+      if (!d.tasks.length) { root.appendChild(h('p', { 'class': 'pip-msg', text: 'Aucune tâche pour l’instant.' })); return; }
+      var ul = h('ul', { 'class': 'pip-list' });
+      d.tasks.forEach(function (t) {
+        var on = !!t.run;
+        var timeEl = h('div', { 'class': 'time', text: '0:00:00' });
+        pipEls[t.id] = timeEl;
+        var btn = h('button', {
+          type: 'button', 'class': 'play' + (on ? ' on' : ''), 'aria-pressed': on ? 'true' : 'false',
+          'aria-label': (on ? 'Arrêter ' : 'Démarrer ') + (t.label || 'la tâche'),
+          onclick: function () { toggle('tasks', t.id); }
+        });
+        btn.innerHTML = on ? PAUSE : PLAY;
+        ul.appendChild(h('li', { 'class': 'prow' + (on ? ' run' : '') }, [
+          btn, h('div', { 'class': 'plabel', text: t.label, title: t.label }), timeEl
+        ]));
+      });
+      root.appendChild(ul);
+      pipTick();
+    } catch (e) {}
+  }
+  function pipTick() {
+    if (!pipWin) return;
+    var d = selId && days[selId];
+    if (!d) return;
+    var at = Date.now();
+    d.tasks.forEach(function (t) { var el = pipEls[t.id]; if (el) setText2(el, fmt(elapsed(t, at))); });
+  }
+  async function pipToggle() {
+    if (pipWin) { try { pipWin.close(); } catch (e) {} pipClosed(); return; }
+    if (!pipSupported()) return;
+    try {
+      var d = selId && days[selId];
+      var n = d ? d.tasks.length : 0;
+      var w = await window.documentPictureInPicture.requestWindow({ width: 320, height: Math.min(560, 120 + 66 * Math.max(1, n)) });
+      pipWin = w;
+      var doc = w.document;
+      doc.title = 'Chronos';
+      var th = document.documentElement.getAttribute('data-theme');
+      if (th) doc.documentElement.setAttribute('data-theme', th);
+      Array.prototype.forEach.call(document.querySelectorAll('link[rel="stylesheet"], style'), function (n2) {
+        doc.head.appendChild(n2.cloneNode(true));
+      });
+      var root = doc.createElement('div');
+      root.id = 'pipRoot'; root.className = 'pip';
+      doc.body.appendChild(root);
+      w.addEventListener('pagehide', pipClosed);
+      pipSetBtn();
+      pipRender();
+    } catch (e) {
+      pipClosed();
+      toast('La mini-fenêtre n’a pas pu s’ouvrir ici.');
+    }
+  }
+  if (pipSupported()) {
+    $('pipBtn').hidden = false;
+    $('pipBtn').addEventListener('click', pipToggle);
+  }
 
   /* ---------- tutorial demo (never saved, never exported) ---------- */
   var DEMO_STEP = 5 * 60000;

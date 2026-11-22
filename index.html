@@ -305,7 +305,7 @@ button { cursor: pointer; }
     </section>
 
     <section class="sec" aria-labelledby="todosTitle">
-      <h2 class="sec-title" id="todosTitle">Next thing to do</h2>
+      <h2 class="sec-title" id="todosTitle">Next</h2>
       <p class="fine" id="todosCount" hidden></p>
       <ul class="todos" id="todosList"></ul>
       <p class="empty" id="todosEmpty" hidden>Rien à faire pour l’instant. Ajoute ce que tu veux faire ensuite. Ce qui n’est pas coché passera dans ta prochaine journée.</p>
@@ -1302,7 +1302,7 @@ button { cursor: pointer; }
     root.appendChild(h('div', { 'class': 'pip-top' }, [dayEl, sel]));
     root.appendChild(list);
     root.appendChild(h('div', { 'class': 'pip-add' }, [input, addBtn]));
-    root.appendChild(h('p', { 'class': 'pip-sub', text: 'Next thing to do' }));
+    root.appendChild(h('p', { 'class': 'pip-sub', text: 'Next' }));
     root.appendChild(todoList);
     root.appendChild(h('div', { 'class': 'pip-add' }, [todoInput, todoBtn]));
     pipUi = { day: dayEl, step: sel, input: input, addBtn: addBtn, list: list, todoList: todoList, todoInput: todoInput, todoBtn: todoBtn };
